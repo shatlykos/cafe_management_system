@@ -19,12 +19,18 @@
     <img src="{{ url_for('client_barcode_svg', client_id=client.id) }}" alt="barcode" style="margin-top:12px; max-width:100%;">
   </div>
   <div class="card">
-    <div class="card-label">Завтраков всего</div>
-    <div class="card-value">{{ stats.count_total }}</div>
+    <div class="card-label">Цикл (30 дней)</div>
+    <div class="card-value">{{ stats.cycle_step }}/7</div>
+    <div class="card-sub">За 30 дней: {{ stats.count_30_days }} | Всего: {{ stats.count_total }}</div>
   </div>
   <div class="card">
     <div class="card-label">До бесплатного</div>
     <div class="card-value">{% if stats.next_is_free %}⭐{% else %}{{ stats.visits_until_free }}{% endif %}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Кофе: цикл (30 дней)</div>
+    <div class="card-value">{{ coffee_stats.cycle_step }}/7</div>
+    <div class="card-sub">За 30 дней: {{ coffee_stats.count_30_days }} | Всего: {{ coffee_stats.count_total }}</div>
   </div>
 </div>
 
@@ -57,6 +63,38 @@
 {% else %}
 <div class="form-box">
   <p style="color:#888;">История пока пуста.</p>
+</div>
+{% endif %}
+
+<h2 style="margin-top:20px;">История кофе</h2>
+{% if coffee_visits %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Статус</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in coffee_visits %}
+      <tr>
+        <td>{{ v.date }}</td>
+        <td>
+          {% if v.is_free %}
+            <span class="badge badge-free">Бесплатно</span>
+          {% else %}
+            <span class="badge badge-paid">Платный</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="form-box">
+  <p style="color:#888;">История кофе пока пуста.</p>
 </div>
 {% endif %}
 

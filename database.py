@@ -6,7 +6,7 @@
 import sqlite3
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import secrets
 
 
@@ -81,6 +81,16 @@ class BreakfastVisit:
     client_id: int
     date: str
     is_free: bool = False  # бесплатный (7-й в месяце)
+    client_name: Optional[str] = None
+
+
+@dataclass
+class CoffeeVisit:
+    """Посещение кофе клиентом"""
+    id: Optional[int]
+    client_id: int
+    date: str
+    is_free: bool = False
     client_name: Optional[str] = None
 
 
@@ -185,6 +195,17 @@ class CafeDatabase:
         # Посещения завтрака
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS breakfast_visits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                is_free INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Посещения кофе
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS coffee_visits (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 client_id INTEGER NOT NULL,
                 date TEXT NOT NULL,
@@ -736,20 +757,37 @@ class CafeDatabase:
         conn.close()
         return row['cnt'] if row else 0
 
+    def get_breakfast_count_last_30_days(self, client_id: int, reference_date: str) -> int:
+        """Количество завтраков клиента за последние 30 дней (включая reference_date)."""
+        ref_dt = datetime.strptime(reference_date, "%Y-%m-%d")
+        start_dt = ref_dt - timedelta(days=29)
+        start_str = start_dt.strftime("%Y-%m-%d")
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM breakfast_visits
+            WHERE client_id = ?
+              AND date >= ?
+              AND date <= ?
+        """, (client_id, start_str, reference_date))
+        row = cursor.fetchone()
+        conn.close()
+        return row['cnt'] if row else 0
+
     def add_breakfast_visit(self, client_id: int,
                             date: Optional[str] = None) -> Tuple[int, bool]:
         """
         Зарегистрировать завтрак клиента.
         Возвращает (id записи, is_free).
-        Каждый 7-й завтрак за всё время — бесплатный (без сброса по месяцу).
+        Каждый 7-й завтрак за последние 30 дней — бесплатный.
         """
         if date is None:
             date = datetime.now().strftime("%Y-%m-%d")
 
-        total_count = self.get_breakfast_count_total(client_id)
+        count_30_days = self.get_breakfast_count_last_30_days(client_id, date)
 
-        # Следующий завтрак будет (total_count + 1)-м
-        next_number = total_count + 1
+        # Следующий завтрак будет (count_30_days + 1)-м в окне 30 дней
+        next_number = count_30_days + 1
         is_free = (next_number % 7 == 0)
 
         conn = self.get_connection()
@@ -797,16 +835,131 @@ class CafeDatabase:
                                client_name=r['client_name']) for r in rows]
 
     def get_client_breakfast_stats(self, client_id: int) -> Dict:
-        """Статистика завтраков клиента (непрерывная система 7-го бесплатного)."""
-        count = self.get_breakfast_count_total(client_id)
-        visits_until_free = 7 - (count % 7)
-        if visits_until_free == 7 and count > 0:
+        """Статистика завтраков клиента для правила 7-го бесплатного за 30 дней."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        count_total = self.get_breakfast_count_total(client_id)
+        count_30_days = self.get_breakfast_count_last_30_days(client_id, today)
+        cycle_step = count_30_days % 7
+        if count_30_days > 0 and cycle_step == 0:
+            cycle_step = 7
+        visits_until_free = 7 - (count_30_days % 7)
+        if visits_until_free == 7 and count_30_days > 0:
             visits_until_free = 7
         return {
-            'count_total': count,
-            'count_this_month': count,  # оставлено для обратной совместимости шаблонов
+            'count_total': count_total,
+            'count_30_days': count_30_days,
+            'count_this_month': count_30_days,  # обратная совместимость
+            'cycle_step': cycle_step,   # текущий шаг цикла 1..7
             'visits_until_free': visits_until_free,
-            'next_is_free': (count % 7 == 6),
+            'next_is_free': (count_30_days % 7 == 6),
+        }
+
+    # ========== Кофе ==========
+
+    def get_coffee_count_total(self, client_id: int) -> int:
+        """Общее количество кофе клиента за всё время."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM coffee_visits
+            WHERE client_id = ?
+        """, (client_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row['cnt'] if row else 0
+
+    def get_coffee_count_last_30_days(self, client_id: int, reference_date: str) -> int:
+        """Количество кофе клиента за последние 30 дней (включая reference_date)."""
+        ref_dt = datetime.strptime(reference_date, "%Y-%m-%d")
+        start_dt = ref_dt - timedelta(days=29)
+        start_str = start_dt.strftime("%Y-%m-%d")
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM coffee_visits
+            WHERE client_id = ?
+              AND date >= ?
+              AND date <= ?
+        """, (client_id, start_str, reference_date))
+        row = cursor.fetchone()
+        conn.close()
+        return row['cnt'] if row else 0
+
+    def add_coffee_visit(self, client_id: int,
+                         date: Optional[str] = None) -> Tuple[int, bool]:
+        """
+        Зарегистрировать кофе клиента.
+        Возвращает (id записи, is_free).
+        Каждый 7-й кофе за последние 30 дней — бесплатный.
+        """
+        if date is None:
+            date = datetime.now().strftime("%Y-%m-%d")
+
+        count_30_days = self.get_coffee_count_last_30_days(client_id, date)
+        next_number = count_30_days + 1
+        is_free = (next_number % 7 == 0)
+
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO coffee_visits (client_id, date, is_free)
+            VALUES (?, ?, ?)
+        """, (client_id, date, int(is_free)))
+        conn.commit()
+        visit_id = cursor.lastrowid
+        conn.close()
+        return visit_id, is_free
+
+    def get_coffee_visits(self, client_id: Optional[int] = None,
+                          start_date: Optional[str] = None,
+                          end_date: Optional[str] = None) -> List[CoffeeVisit]:
+        """Получить историю кофе."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT cv.*, c.name as client_name
+            FROM coffee_visits cv
+            JOIN clients c ON cv.client_id = c.id
+            WHERE 1=1
+        """
+        params = []
+
+        if client_id is not None:
+            query += " AND cv.client_id = ?"
+            params.append(client_id)
+        if start_date:
+            query += " AND cv.date >= ?"
+            params.append(start_date)
+        if end_date:
+            query += " AND cv.date <= ?"
+            params.append(end_date)
+
+        query += " ORDER BY cv.date DESC"
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [CoffeeVisit(id=r['id'], client_id=r['client_id'],
+                            date=r['date'], is_free=bool(r['is_free']),
+                            client_name=r['client_name']) for r in rows]
+
+    def get_client_coffee_stats(self, client_id: int) -> Dict:
+        """Статистика кофе клиента для правила 7-го бесплатного за 30 дней."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        count_total = self.get_coffee_count_total(client_id)
+        count_30_days = self.get_coffee_count_last_30_days(client_id, today)
+        cycle_step = count_30_days % 7
+        if count_30_days > 0 and cycle_step == 0:
+            cycle_step = 7
+        visits_until_free = 7 - (count_30_days % 7)
+        if visits_until_free == 7 and count_30_days > 0:
+            visits_until_free = 7
+        return {
+            'count_total': count_total,
+            'count_30_days': count_30_days,
+            'cycle_step': cycle_step,
+            'visits_until_free': visits_until_free,
+            'next_is_free': (count_30_days % 7 == 6),
         }
 
     # ========== Журнал баркодов ==========

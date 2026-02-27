@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}История завтраков — {{ client.name }}{% endblock %}
+{% block title %}История кофе — {{ client.name }}{% endblock %}
 {% block content %}
 
 <div class="flex-between">
-  <h1>История завтраков: {{ client.name }}</h1>
-  <a href="{{ url_for('breakfasts') }}" class="btn btn-brown">← Назад</a>
+  <h1>История кофе: {{ client.name }}</h1>
+  <a href="{{ url_for('coffee') }}" class="btn btn-brown">← Назад</a>
 </div>
 
 <div class="cards" style="margin-top:16px;">
@@ -28,7 +28,7 @@
     <a href="{{ url_for('client_barcode_svg', client_id=client.id) }}" target="_blank" class="btn btn-sm mt-16" style="background:var(--cream-dark); color:var(--brown);">Открыть штрихкод</a>
   </div>
   <div class="card">
-    <div class="card-label">Всего завтраков</div>
+    <div class="card-label">Всего кофе</div>
     <div class="card-value">{{ visits|length }}</div>
     <div class="card-sub">Бесплатных: {{ visits|selectattr('is_free')|list|length }}</div>
   </div>
@@ -63,7 +63,7 @@
 </div>
 {% else %}
 <div class="form-box" style="text-align:center; padding:40px;">
-  <p style="color:#888; font-size:16px;">Завтраков пока нет.</p>
+  <p style="color:#888; font-size:16px;">Кофе пока нет.</p>
 </div>
 {% endif %}
 

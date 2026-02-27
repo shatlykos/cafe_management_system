@@ -209,7 +209,12 @@ def send_client_card_to_telegram(client, chat_id: str):
         "text": text,
         "parse_mode": "Markdown"
     })
-    telegram_send_photo(chat_id, f"barcode_{client.id}.png", png_bytes, "Ваш штрихкод")
+    telegram_send_photo(
+        chat_id,
+        f"barcode_{client.id}.png",
+        png_bytes,
+        f"Ваш штрихкод: {client.barcode}"
+    )
 
 
 def send_client_menu(chat_id: str):
@@ -229,17 +234,12 @@ def send_client_menu(chat_id: str):
 
 @app.route("/")
 def index():
-    now = datetime.now()
-    month_start = now.strftime("%Y-%m-01")
-    month_end = now.strftime("%Y-%m-%d")
-    profit = db.get_profit(month_start, month_end)
-    sales_today = db.get_sales(today(), today())
-    revenue_today = sum(s.total_amount for s in sales_today)
     clients = db.get_clients()
+    breakfasts_today = db.get_breakfast_visits(start_date=today(), end_date=today())
+    coffees_today = db.get_coffee_visits(start_date=today(), end_date=today())
     return render_template("index.html",
-                           profit=profit,
-                           revenue_today=revenue_today,
-                           sales_today=len(sales_today),
+                           breakfasts_today=len(breakfasts_today),
+                           coffees_today=len(coffees_today),
                            clients_count=len(clients),
                            today=today())
 
@@ -265,13 +265,13 @@ def register_breakfast():
     client = db.get_client(client_id)
     _, is_free = db.add_breakfast_visit(client_id, date)
     if is_free:
-        flash(f"🎉 Поздравляем! 7-й завтрак {client.name} — БЕСПЛАТНО!", "success")
+        flash(f"🎉 Поздравляем! 7-й завтрак {client.name} за 30 дней — БЕСПЛАТНО!", "success")
     else:
         stats = db.get_client_breakfast_stats(client_id)
         if stats["next_is_free"]:
-            flash(f"Завтрак записан. Следующий завтрак {client.name} будет БЕСПЛАТНЫМ!", "warning")
+            flash(f"Завтрак записан. Следующий завтрак {client.name} за 30 дней будет БЕСПЛАТНЫМ!", "warning")
         else:
-            flash(f"Завтрак записан. До бесплатного осталось: {stats['visits_until_free']}.", "info")
+            flash(f"Завтрак записан. До бесплатного (30 дней) осталось: {stats['visits_until_free']}.", "info")
     return redirect(url_for("breakfasts"))
 
 
@@ -305,6 +305,69 @@ def breakfast_history(client_id):
     stats = db.get_client_breakfast_stats(client_id)
     events = db.get_client_barcode_events(client_id=client_id, limit=100)
     return render_template("breakfast_history.html", client=client, visits=visits, stats=stats, events=events)
+
+
+# ─────────────────────────────────────────────
+# Кофе
+# ─────────────────────────────────────────────
+
+@app.route("/coffee")
+def coffee():
+    clients = db.get_clients()
+    client_data = []
+    for c in clients:
+        stats = db.get_client_coffee_stats(c.id)
+        client_data.append({"client": c, "stats": stats})
+    return render_template("coffee.html", client_data=client_data, today=today())
+
+
+@app.route("/coffee/register", methods=["POST"])
+def register_coffee():
+    client_id = int(request.form["client_id"])
+    date = request.form.get("date") or today()
+    client = db.get_client(client_id)
+    _, is_free = db.add_coffee_visit(client_id, date)
+    if is_free:
+        flash(f"🎉 Поздравляем! 7-й кофе {client.name} за 30 дней — БЕСПЛАТНО!", "success")
+    else:
+        stats = db.get_client_coffee_stats(client_id)
+        if stats["next_is_free"]:
+            flash(f"Кофе записан. Следующий кофе {client.name} за 30 дней будет БЕСПЛАТНЫМ!", "warning")
+        else:
+            flash(f"Кофе записан. До бесплатного (30 дней) осталось: {stats['visits_until_free']}.", "info")
+    return redirect(url_for("coffee"))
+
+
+@app.route("/coffee/scan", methods=["POST"])
+def scan_coffee_by_barcode():
+    barcode_value = (request.form.get("barcode") or "").strip()
+    date = request.form.get("date") or today()
+    if not barcode_value:
+        flash("Введите штрихкод для сканирования.", "danger")
+        return redirect(url_for("coffee"))
+    client = db.get_client_by_barcode(barcode_value)
+    if not client:
+        flash(f"Клиент с кодом {barcode_value} не найден.", "danger")
+        return redirect(url_for("coffee"))
+    _, is_free = db.add_coffee_visit(client.id, date)
+    db.log_barcode_event(client.id, "coffee_scanned", f"Кофе зарегистрирован за {date}")
+    if is_free:
+        flash(f"Сканирование OK: {client.name}. Это бесплатный кофе.", "success")
+    else:
+        flash(f"Сканирование OK: {client.name}. Кофе записан.", "success")
+    return redirect(url_for("coffee"))
+
+
+@app.route("/coffee/history/<int:client_id>")
+def coffee_history(client_id):
+    client = db.get_client(client_id)
+    if not client:
+        flash("Клиент не найден.", "danger")
+        return redirect(url_for("coffee"))
+    visits = db.get_coffee_visits(client_id=client_id)
+    stats = db.get_client_coffee_stats(client_id)
+    events = db.get_client_barcode_events(client_id=client_id, limit=100)
+    return render_template("coffee_history.html", client=client, visits=visits, stats=stats, events=events)
 
 
 @app.route("/clients/add", methods=["POST"])
@@ -357,11 +420,19 @@ def client_barcode_svg(client_id):
 def client_portal(token):
     client = db.get_client_by_history_token(token)
     if not client:
-        return render_template("client_portal.html", client=None, visits=[], stats=None, events=[]), 404
+        return render_template("client_portal.html", client=None, visits=[], stats=None, coffee_visits=[], coffee_stats=None, events=[]), 404
     visits = db.get_breakfast_visits(client_id=client.id)
     stats = db.get_client_breakfast_stats(client.id)
+    coffee_visits = db.get_coffee_visits(client_id=client.id)
+    coffee_stats = db.get_client_coffee_stats(client.id)
     events = db.get_client_barcode_events(client_id=client.id, limit=100)
-    return render_template("client_portal.html", client=client, visits=visits, stats=stats, events=events)
+    return render_template("client_portal.html",
+                           client=client,
+                           visits=visits,
+                           stats=stats,
+                           coffee_visits=coffee_visits,
+                           coffee_stats=coffee_stats,
+                           events=events)
 
 
 @app.route("/telegram/webhook", methods=["POST"])

@@ -206,10 +206,9 @@
 <nav>
   <a href="{{ url_for('index') }}"      class="{{ 'active' if request.endpoint == 'index' }}">🏠 Главная</a>
   <a href="{{ url_for('breakfasts') }}" class="{{ 'active' if 'breakfast' in request.endpoint or request.endpoint == 'breakfasts' }}">☕ Завтраки</a>
-  <a href="{{ url_for('sales') }}"      class="{{ 'active' if request.endpoint == 'sales' }}">🧾 Продажи</a>
+  <a href="{{ url_for('coffee') }}"     class="{{ 'active' if 'coffee' in request.endpoint }}">☕ Кофе</a>
   <a href="{{ url_for('dishes') }}"     class="{{ 'active' if request.endpoint == 'dishes' }}">🍽 Блюда</a>
   <a href="{{ url_for('expenses') }}"   class="{{ 'active' if request.endpoint == 'expenses' }}">💸 Расходы</a>
-  <a href="{{ url_for('report') }}"     class="{{ 'active' if request.endpoint == 'report' }}">📊 Отчёт</a>
 </nav>
 
 <main>

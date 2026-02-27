@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Завтраки — GALAXY FOOD{% endblock %}
+{% block title %}Кофе — GALAXY FOOD{% endblock %}
 {% block content %}
 
 <div class="flex-between">
-  <h1>☕ Завтраки</h1>
+  <h1>☕ Кофе</h1>
   <button class="btn btn-gold" onclick="openModal('modal-add-client')">+ Новый клиент</button>
 </div>
 
 <p style="color:#888; margin-bottom:20px; font-size:14px;">
-  Правило: каждый <strong>7-й завтрак</strong> за последние 30 дней — <strong style="color:#2E7D32;">БЕСПЛАТНО</strong>
+  Правило: каждый <strong>7-й кофе</strong> за последние 30 дней — <strong style="color:#2E7D32;">БЕСПЛАТНО</strong>
 </p>
 
 <div class="form-box" style="margin-bottom:18px;">
-  <form method="POST" action="{{ url_for('scan_breakfast_by_barcode') }}">
+  <form method="POST" action="{{ url_for('scan_coffee_by_barcode') }}">
     <div class="form-row" style="align-items:end;">
       <div class="form-group" style="min-width:280px;">
         <label>Сканировать штрихкод</label>
@@ -77,12 +77,12 @@
         </td>
         <td style="display:flex; gap:8px; flex-wrap:wrap;">
           <a href="{{ url_for('client_barcode_svg', client_id=c.id) }}" target="_blank" class="btn btn-sm" style="background:var(--cream-dark); color:var(--brown);">Штрихкод</a>
-          <form method="POST" action="{{ url_for('register_breakfast') }}" style="display:inline;">
+          <form method="POST" action="{{ url_for('register_coffee') }}" style="display:inline;">
             <input type="hidden" name="client_id" value="{{ c.id }}">
             <input type="hidden" name="date" value="{{ request.args.get('date', '') }}">
-            <button class="btn btn-green btn-sm" type="submit">✔ Записать завтрак</button>
+            <button class="btn btn-green btn-sm" type="submit">✔ Записать кофе</button>
           </form>
-          <a href="{{ url_for('breakfast_history', client_id=c.id) }}" class="btn btn-sm" style="background:var(--cream-dark); color:var(--brown);">История</a>
+          <a href="{{ url_for('coffee_history', client_id=c.id) }}" class="btn btn-sm" style="background:var(--cream-dark); color:var(--brown);">История</a>
           <form method="POST" action="{{ url_for('delete_client', client_id=c.id) }}" style="display:inline;"
                 onsubmit="return confirm('Удалить клиента {{ c.name }}?')">
             <button class="btn btn-red btn-sm" type="submit">✕</button>
@@ -101,7 +101,6 @@
 </div>
 {% endif %}
 
-<!-- Модальное окно: добавить клиента -->
 <div class="modal-bg" id="modal-add-client">
   <div class="modal">
     <span class="modal-close" onclick="closeModal('modal-add-client')">✕</span>
