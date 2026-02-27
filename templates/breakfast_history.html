@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}История завтраков — {{ client.name }}{% endblock %}
+{% block content %}
+
+<div class="flex-between">
+  <h1>История завтраков: {{ client.name }}</h1>
+  <a href="{{ url_for('breakfasts') }}" class="btn btn-brown">← Назад</a>
+</div>
+
+<div class="cards" style="margin-top:16px;">
+  <div class="card">
+    <div class="card-label">Завтраков всего</div>
+    <div class="card-value">{{ stats.count_total }}</div>
+  </div>
+  <div class="card">
+    <div class="card-label">До бесплатного</div>
+    <div class="card-value">
+      {% if stats.next_is_free %}⭐{% else %}{{ stats.visits_until_free }}{% endif %}
+    </div>
+    {% if stats.next_is_free %}
+    <div class="card-sub" style="color:#2E7D32; font-weight:700;">Следующий бесплатный!</div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-label">Штрихкод</div>
+    <div style="margin-top:8px; font-family:monospace; font-size:18px; font-weight:700;">{{ client.barcode }}</div>
+    <a href="{{ url_for('client_barcode_svg', client_id=client.id) }}" target="_blank" class="btn btn-sm mt-16" style="background:var(--cream-dark); color:var(--brown);">Открыть штрихкод</a>
+  </div>
+  <div class="card">
+    <div class="card-label">Всего завтраков</div>
+    <div class="card-value">{{ visits|length }}</div>
+    <div class="card-sub">Бесплатных: {{ visits|selectattr('is_free')|list|length }}</div>
+  </div>
+</div>
+
+{% if visits %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Дата</th>
+        <th>Статус</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in visits %}
+      <tr>
+        <td style="color:#aaa;">{{ loop.index }}</td>
+        <td>{{ v.date }}</td>
+        <td>
+          {% if v.is_free %}
+            <span class="badge badge-free">🎉 Бесплатно</span>
+          {% else %}
+            <span class="badge badge-paid">Платный</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="form-box" style="text-align:center; padding:40px;">
+  <p style="color:#888; font-size:16px;">Завтраков пока нет.</p>
+</div>
+{% endif %}
+
+<h2 style="margin-top:20px;">История штрихкода</h2>
+{% if events %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Дата и время</th>
+        <th>Событие</th>
+        <th>Детали</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td>{{ e.event_date }}</td>
+        <td><span class="badge badge-gold">{{ e.event_type }}</span></td>
+        <td>{{ e.details or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="form-box" style="text-align:center; padding:20px;">
+  <p style="color:#888; font-size:15px;">Пока нет событий по штрихкоду.</p>
+</div>
+{% endif %}
+
+{% endblock %}

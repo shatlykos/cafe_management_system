@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Блюда — GALAXY FOOD{% endblock %}
+{% block content %}
+
+<div class="flex-between">
+  <h1>🍽 Блюда</h1>
+  <button class="btn btn-gold" onclick="openModal('modal-add-dish')">+ Добавить блюдо</button>
+</div>
+
+{% if dish_data %}
+<div class="table-wrap" style="margin-top:20px;">
+  <table>
+    <thead>
+      <tr>
+        <th>Название</th>
+        <th>Категория</th>
+        <th class="text-right">Цена</th>
+        <th class="text-right">Себестоимость</th>
+        <th class="text-right">Маржа %</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in dish_data %}
+      {% set d = item.dish %}
+      {% set m = item.margin %}
+      <tr>
+        <td><strong>{{ d.name }}</strong>{% if d.description %}<br><span style="font-size:12px;color:#aaa;">{{ d.description }}</span>{% endif %}</td>
+        <td><span class="badge badge-paid">{{ d.category }}</span></td>
+        <td class="text-right text-gold">{{ "%.0f"|format(m.price) }} GEL</td>
+        <td class="text-right">{{ "%.0f"|format(m.cost) }} GEL</td>
+        <td class="text-right">
+          {% if m.margin_percent >= 50 %}
+            <span style="color:#2E7D32; font-weight:700;">{{ "%.0f"|format(m.margin_percent) }}%</span>
+          {% elif m.margin_percent >= 25 %}
+            <span style="color:#E65100; font-weight:700;">{{ "%.0f"|format(m.margin_percent) }}%</span>
+          {% else %}
+            <span style="color:#B71C1C; font-weight:700;">{{ "%.0f"|format(m.margin_percent) }}%</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="POST" action="{{ url_for('delete_dish', dish_id=d.id) }}"
+                onsubmit="return confirm('Удалить «{{ d.name }}»?')">
+            <button class="btn btn-red btn-sm" type="submit">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="form-box" style="text-align:center; padding:40px; margin-top:20px;">
+  <div style="font-size:48px;">🍽</div>
+  <p style="color:#888; font-size:16px; margin-top:12px;">Блюд пока нет.</p>
+  <button class="btn btn-gold mt-16" onclick="openModal('modal-add-dish')">+ Добавить первое блюдо</button>
+</div>
+{% endif %}
+
+<!-- Модальное окно: добавить блюдо -->
+<div class="modal-bg" id="modal-add-dish">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal('modal-add-dish')">✕</span>
+    <h2>Новое блюдо</h2>
+    <form method="POST" action="{{ url_for('add_dish') }}">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Название *</label>
+        <input type="text" name="name" placeholder="Например: Манты" required autofocus>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Цена продажи *</label>
+          <input type="number" name="price" placeholder="0" min="0" step="0.01" required>
+        </div>
+        <div class="form-group">
+          <label>Категория *</label>
+          <select name="category" required>
+            <option value="">— выберите —</option>
+            <option>Завтраки</option>
+            <option>Основные блюда</option>
+            <option>Супы</option>
+            <option>Салаты</option>
+            <option>Десерты</option>
+            <option>Напитки</option>
+            <option>Прочее</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:20px; margin-top:14px;">
+        <label>Описание</label>
+        <input type="text" name="description" placeholder="Необязательно">
+      </div>
+      <button class="btn btn-gold btn-block" type="submit">Добавить блюдо</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

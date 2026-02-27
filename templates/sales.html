@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Продажи — GALAXY FOOD{% endblock %}
+{% block content %}
+
+<div class="flex-between">
+  <h1>🧾 Продажи</h1>
+  <button class="btn btn-gold" onclick="openModal('modal-add-sale')">+ Добавить продажу</button>
+</div>
+
+<!-- Фильтр по дате -->
+<form method="GET" class="form-box" style="padding:16px 20px;">
+  <div class="form-row" style="margin-bottom:0; align-items:flex-end;">
+    <div class="form-group">
+      <label>С даты</label>
+      <input type="date" name="start" value="{{ start }}">
+    </div>
+    <div class="form-group">
+      <label>По дату</label>
+      <input type="date" name="end" value="{{ end }}">
+    </div>
+    <div>
+      <button class="btn btn-brown" type="submit">Показать</button>
+    </div>
+  </div>
+</form>
+
+{% if sales %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Блюдо</th>
+        <th>Кол-во</th>
+        <th class="text-right">Сумма</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sales %}
+      <tr>
+        <td>{{ s.date }}</td>
+        <td>{{ s.dish_name }}</td>
+        <td>{{ s.quantity }}</td>
+        <td class="text-right text-gold">{{ "%.0f"|format(s.total_amount) }} GEL</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div style="text-align:right; font-size:18px; font-weight:800; color:var(--brown); padding-right:8px;">
+  Итого: <span class="text-gold">{{ "%.0f"|format(total) }} GEL</span>
+</div>
+{% else %}
+<div class="form-box" style="text-align:center; padding:40px;">
+  <div style="font-size:48px;">🧾</div>
+  <p style="color:#888; font-size:16px; margin-top:12px;">Продаж за выбранный период нет.</p>
+</div>
+{% endif %}
+
+<!-- Модальное окно: добавить продажу -->
+<div class="modal-bg" id="modal-add-sale">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal('modal-add-sale')">✕</span>
+    <h2>Новая продажа</h2>
+    <form method="POST" action="{{ url_for('add_sale') }}">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Блюдо *</label>
+        <select name="dish_id" required>
+          <option value="">— выберите блюдо —</option>
+          {% for d in dishes %}
+          <option value="{{ d.id }}">{{ d.name }} — {{ "%.0f"|format(d.price) }} GEL</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Количество порций *</label>
+        <input type="number" name="quantity" value="1" min="1" required>
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>Дата</label>
+        <input type="date" name="date" value="{{ start }}">
+      </div>
+      <button class="btn btn-gold btn-block" type="submit">Записать продажу</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

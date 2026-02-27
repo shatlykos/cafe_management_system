@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Отчёт — GALAXY FOOD{% endblock %}
+{% block content %}
+
+<h1>📊 Финансовый отчёт</h1>
+
+<form method="GET" class="form-box" style="padding:16px 20px;">
+  <div class="form-row" style="margin-bottom:0; align-items:flex-end;">
+    <div class="form-group">
+      <label>С даты</label>
+      <input type="date" name="start" value="{{ start }}">
+    </div>
+    <div class="form-group">
+      <label>По дату</label>
+      <input type="date" name="end" value="{{ end }}">
+    </div>
+    <div>
+      <button class="btn btn-brown" type="submit">Показать</button>
+    </div>
+  </div>
+</form>
+
+<p style="color:#aaa; font-size:13px; margin-bottom:20px;">Период: {{ start }} — {{ end }}</p>
+
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Выручка</div>
+    <div class="card-value">{{ "%.0f"|format(profit.revenue) }} GEL</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Себестоимость</div>
+    <div class="card-value" style="font-size:24px;">{{ "%.0f"|format(profit.cost_of_goods_sold) }} GEL</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Валовая прибыль</div>
+    <div class="card-value" style="color:var(--gold-dark);">{{ "%.0f"|format(profit.gross_profit) }} GEL</div>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Расходы</div>
+    <div class="card-value" style="color:var(--red); font-size:24px;">{{ "%.0f"|format(profit.total_expenses) }} GEL</div>
+  </div>
+  <div class="card" style="border: 2px solid {% if profit.net_profit >= 0 %}var(--green){% else %}var(--red){% endif %};">
+    <div class="card-label">Чистая прибыль</div>
+    <div class="card-value" style="color:{% if profit.net_profit >= 0 %}#2E7D32{% else %}var(--red){% endif %};">
+      {{ "%.0f"|format(profit.net_profit) }} GEL
+    </div>
+    <div class="card-sub">
+      {% if profit.net_profit >= 0 %}В плюсе ✔{% else %}В минусе ✗{% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

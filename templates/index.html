@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Главная — GALAXY FOOD{% endblock %}
+{% block content %}
+
+<h1>Добро пожаловать 👋</h1>
+
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Выручка сегодня</div>
+    <div class="card-value">{{ "%.0f"|format(revenue_today) }} GEL</div>
+    <div class="card-sub">{{ sales_today }} продаж</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Выручка за месяц</div>
+    <div class="card-value">{{ "%.0f"|format(profit.revenue) }} GEL</div>
+    <div class="card-sub">Валовая прибыль: {{ "%.0f"|format(profit.gross_profit) }} GEL</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Расходы за месяц</div>
+    <div class="card-value">{{ "%.0f"|format(profit.total_expenses) }} GEL</div>
+    <div class="card-sub">Чистая прибыль: {{ "%.0f"|format(profit.net_profit) }} GEL</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Клиентов</div>
+    <div class="card-value">{{ clients_count }}</div>
+    <div class="card-sub">в программе завтраков</div>
+  </div>
+</div>
+
+<div class="section-title">Быстрые действия</div>
+<div class="cards">
+  <a href="{{ url_for('breakfasts') }}" class="btn btn-gold" style="flex:1; min-width:200px; justify-content:center; padding:18px; font-size:17px;">
+    ☕ Записать завтрак
+  </a>
+  <a href="{{ url_for('sales') }}" class="btn btn-brown" style="flex:1; min-width:200px; justify-content:center; padding:18px; font-size:17px;">
+    🧾 Добавить продажу
+  </a>
+  <a href="{{ url_for('report') }}" class="btn btn-gold" style="flex:1; min-width:200px; justify-content:center; padding:18px; font-size:17px;">
+    📊 Посмотреть отчёт
+  </a>
+</div>
+
+{% endblock %}

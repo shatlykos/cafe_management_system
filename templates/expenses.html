@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Расходы — GALAXY FOOD{% endblock %}
+{% block content %}
+
+<div class="flex-between">
+  <h1>💸 Расходы</h1>
+  <button class="btn btn-gold" onclick="openModal('modal-add-expense')">+ Добавить расход</button>
+</div>
+
+<!-- Фильтр -->
+<form method="GET" class="form-box" style="padding:16px 20px; margin-top:16px;">
+  <div class="form-row" style="margin-bottom:0; align-items:flex-end;">
+    <div class="form-group">
+      <label>С даты</label>
+      <input type="date" name="start" value="{{ start }}">
+    </div>
+    <div class="form-group">
+      <label>По дату</label>
+      <input type="date" name="end" value="{{ end }}">
+    </div>
+    <div>
+      <button class="btn btn-brown" type="submit">Показать</button>
+    </div>
+  </div>
+</form>
+
+{% if by_cat %}
+<div class="cards" style="margin-top:8px;">
+  {% for cat, amt in by_cat.items() %}
+  <div class="card" style="min-width:140px; flex:0 1 auto;">
+    <div class="card-label">{{ cat }}</div>
+    <div class="card-value" style="font-size:22px;">{{ "%.0f"|format(amt) }} GEL</div>
+  </div>
+  {% endfor %}
+  <div class="card" style="min-width:140px; flex:0 1 auto; border:2px solid var(--gold);">
+    <div class="card-label">Итого</div>
+    <div class="card-value" style="font-size:22px; color:var(--gold-dark);">{{ "%.0f"|format(total) }} GEL</div>
+  </div>
+</div>
+{% endif %}
+
+{% if expenses %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Категория</th>
+        <th>Описание</th>
+        <th class="text-right">Сумма</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in expenses %}
+      <tr>
+        <td>{{ e.date }}</td>
+        <td><span class="badge badge-paid">{{ e.category }}</span></td>
+        <td style="color:#888;">{{ e.description or '—' }}</td>
+        <td class="text-right text-gold">{{ "%.0f"|format(e.amount) }} GEL</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="form-box" style="text-align:center; padding:40px; margin-top:8px;">
+  <p style="color:#888; font-size:16px;">Расходов за выбранный период нет.</p>
+</div>
+{% endif %}
+
+<!-- Модальное окно -->
+<div class="modal-bg" id="modal-add-expense">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal('modal-add-expense')">✕</span>
+    <h2>Новый расход</h2>
+    <form method="POST" action="{{ url_for('add_expense') }}">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Категория *</label>
+          <select name="category" required>
+            <option value="">— выберите —</option>
+            <option>Аренда</option>
+            <option>Зарплата</option>
+            <option>Коммунальные</option>
+            <option>Продукты</option>
+            <option>Прочее</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Сумма *</label>
+          <input type="number" name="amount" placeholder="0" min="0" step="0.01" required>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px; margin-top:14px;">
+        <label>Дата</label>
+        <input type="date" name="date" value="{{ end }}">
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>Описание</label>
+        <input type="text" name="description" placeholder="Необязательно">
+      </div>
+      <button class="btn btn-gold btn-block" type="submit">Записать расход</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
