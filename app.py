@@ -220,10 +220,15 @@ def send_client_card_to_telegram(client, chat_id: str):
 def send_client_menu(chat_id: str):
     telegram_request("sendMessage", {
         "chat_id": chat_id,
-        "text": "Меню клиента:",
+        "text": "Выберите действие:",
         "reply_markup": json.dumps({
-            "keyboard": [["Мой баркод", "Моя история"]],
-            "resize_keyboard": True
+            "keyboard": [
+                ["Мой баркод", "Моя история"],
+                ["Мой завтрак", "Мой кофе"]
+            ],
+            "resize_keyboard": True,
+            "one_time_keyboard": False,
+            "input_field_placeholder": "Нажмите кнопку меню"
         })
     })
 
@@ -383,7 +388,25 @@ def add_client():
     client_id = db.add_client(name, phone, notes)
     client = db.get_client(client_id)
     flash(f"Клиент «{name}» добавлен. Баркод: {client.barcode}", "success")
+    return_to = (request.form.get("return_to") or "").strip()
+    if return_to == "index":
+        return redirect(url_for("index"))
     return redirect(url_for("breakfasts"))
+
+
+@app.route("/clients/search", methods=["POST"])
+def search_client_by_barcode():
+    barcode_value = (request.form.get("barcode") or "").strip()
+    return_to = (request.form.get("return_to") or "").strip()
+    fallback = url_for("index") if return_to == "index" else url_for("breakfasts")
+    if not barcode_value:
+        flash("Введите штрихкод для поиска.", "danger")
+        return redirect(fallback)
+    client = db.get_client_by_barcode(barcode_value)
+    if not client:
+        flash(f"Клиент с кодом {barcode_value} не найден.", "warning")
+        return redirect(fallback)
+    return redirect(url_for("breakfast_history", client_id=client.id))
 
 
 @app.route("/clients/send-barcode/<int:client_id>", methods=["POST"])
@@ -483,6 +506,9 @@ def telegram_webhook():
         existing = db.get_client_by_telegram_chat(chat_id)
         if existing:
             text_l = text.lower()
+            if text_l in {"/menu", "меню"}:
+                send_client_menu(chat_id)
+                return jsonify({"ok": True})
             if text_l in {"мой баркод", "баркод", "/barcode"}:
                 send_client_card_to_telegram(existing, chat_id)
                 send_client_menu(chat_id)
@@ -492,6 +518,28 @@ def telegram_webhook():
                 telegram_request("sendMessage", {
                     "chat_id": chat_id,
                     "text": f"Ваша история: {history_url}"
+                })
+                send_client_menu(chat_id)
+                return jsonify({"ok": True})
+            if text_l in {"мой завтрак", "/breakfast"}:
+                stats = db.get_client_breakfast_stats(existing.id)
+                telegram_request("sendMessage", {
+                    "chat_id": chat_id,
+                    "text": (
+                        f"Завтрак: цикл {stats['cycle_step']}/7 за 30 дней.\n"
+                        f"До бесплатного: {stats['visits_until_free']}."
+                    )
+                })
+                send_client_menu(chat_id)
+                return jsonify({"ok": True})
+            if text_l in {"мой кофе", "/coffee"}:
+                stats = db.get_client_coffee_stats(existing.id)
+                telegram_request("sendMessage", {
+                    "chat_id": chat_id,
+                    "text": (
+                        f"Кофе: цикл {stats['cycle_step']}/7 за 30 дней.\n"
+                        f"До бесплатного: {stats['visits_until_free']}."
+                    )
                 })
                 send_client_menu(chat_id)
                 return jsonify({"ok": True})
@@ -630,6 +678,6 @@ def report():
 if __name__ == "__main__":
     app.run(
         debug=False,
-        host=os.getenv("HOST", "127.0.0.1"),
+        host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", "8080"))
     )
