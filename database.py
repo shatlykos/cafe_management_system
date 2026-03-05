@@ -4,10 +4,69 @@
 """
 
 import sqlite3
+import re
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import secrets
+
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except Exception:  # pragma: no cover
+    psycopg = None
+    dict_row = None
+
+
+class DBCursor:
+    """Лёгкая обёртка курсора для унификации sqlite/psycopg."""
+
+    def __init__(self, cursor, conn, is_postgres: bool):
+        self._cursor = cursor
+        self._conn = conn
+        self._is_postgres = is_postgres
+
+    def execute(self, query: str, params=None):
+        params = params or ()
+        if self._is_postgres:
+            query = re.sub(r"\?", "%s", query)
+        self._cursor.execute(query, params)
+        return self
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    @property
+    def lastrowid(self):
+        if not self._is_postgres:
+            return self._cursor.lastrowid
+        self._cursor.execute("SELECT LASTVAL() AS id")
+        row = self._cursor.fetchone()
+        if isinstance(row, dict):
+            return row["id"]
+        return row[0]
+
+
+class DBConnection:
+    """Лёгкая обёртка соединения для унификации sqlite/psycopg."""
+
+    def __init__(self, conn, is_postgres: bool):
+        self._conn = conn
+        self._is_postgres = is_postgres
+
+    def cursor(self):
+        if self._is_postgres:
+            return DBCursor(self._conn.cursor(row_factory=dict_row), self._conn, self._is_postgres)
+        return DBCursor(self._conn.cursor(), self._conn, self._is_postgres)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
 
 
 @dataclass
@@ -109,20 +168,22 @@ class CafeDatabase:
 
     def __init__(self, db_path: str = "cafe_data.sqlite3"):
         self.db_path = db_path
+        self.is_postgres = str(db_path).startswith("postgresql://") or str(db_path).startswith("postgres://")
+        if self.is_postgres and psycopg is None:
+            raise RuntimeError("Для PostgreSQL требуется пакет psycopg.")
         self.init_database()
 
     def get_connection(self):
         """Получить соединение с БД"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        if self.is_postgres:
+            raw = psycopg.connect(self.db_path)
+            return DBConnection(raw, True)
+        raw = sqlite3.connect(self.db_path)
+        raw.row_factory = sqlite3.Row
+        return DBConnection(raw, False)
 
-    def init_database(self):
-        """Инициализация базы данных - создание таблиц"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-
-        # Ингредиенты
+    def _init_sqlite_schema(self, cursor):
+        """Создать схему SQLite."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ingredients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,8 +194,6 @@ class CafeDatabase:
                 notes TEXT
             )
         """)
-
-        # Блюда
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS dishes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,8 +203,6 @@ class CafeDatabase:
                 description TEXT
             )
         """)
-
-        # Техкарты (рецепты)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS recipe_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -157,8 +214,6 @@ class CafeDatabase:
                 UNIQUE(dish_id, ingredient_id)
             )
         """)
-
-        # Расходы
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,8 +223,6 @@ class CafeDatabase:
                 description TEXT
             )
         """)
-
-        # Продажи
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sales (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -180,8 +233,6 @@ class CafeDatabase:
                 FOREIGN KEY (dish_id) REFERENCES dishes(id)
             )
         """)
-
-        # Клиенты
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS clients (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,8 +242,6 @@ class CafeDatabase:
                 barcode TEXT
             )
         """)
-
-        # Посещения завтрака
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS breakfast_visits (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -202,8 +251,6 @@ class CafeDatabase:
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
             )
         """)
-
-        # Посещения кофе
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS coffee_visits (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,8 +260,6 @@ class CafeDatabase:
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
             )
         """)
-
-        # Журнал событий по баркодам (отправка, сканирование и т.д.)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS barcode_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,6 +271,104 @@ class CafeDatabase:
             )
         """)
 
+    def _init_postgres_schema(self, cursor):
+        """Создать схему PostgreSQL."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ingredients (
+                id BIGSERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                unit TEXT NOT NULL,
+                price_per_unit DOUBLE PRECISION NOT NULL,
+                supplier TEXT,
+                notes TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dishes (
+                id BIGSERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                price DOUBLE PRECISION NOT NULL,
+                category TEXT NOT NULL,
+                description TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS recipe_items (
+                id BIGSERIAL PRIMARY KEY,
+                dish_id BIGINT NOT NULL,
+                ingredient_id BIGINT NOT NULL,
+                quantity DOUBLE PRECISION NOT NULL,
+                FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
+                FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE,
+                UNIQUE(dish_id, ingredient_id)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id BIGSERIAL PRIMARY KEY,
+                date TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount DOUBLE PRECISION NOT NULL,
+                description TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sales (
+                id BIGSERIAL PRIMARY KEY,
+                date TEXT NOT NULL,
+                dish_id BIGINT NOT NULL,
+                quantity INTEGER NOT NULL,
+                total_amount DOUBLE PRECISION NOT NULL,
+                FOREIGN KEY (dish_id) REFERENCES dishes(id)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clients (
+                id BIGSERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                phone TEXT,
+                notes TEXT,
+                barcode TEXT
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS breakfast_visits (
+                id BIGSERIAL PRIMARY KEY,
+                client_id BIGINT NOT NULL,
+                date TEXT NOT NULL,
+                is_free BOOLEAN NOT NULL DEFAULT FALSE,
+                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS coffee_visits (
+                id BIGSERIAL PRIMARY KEY,
+                client_id BIGINT NOT NULL,
+                date TEXT NOT NULL,
+                is_free BOOLEAN NOT NULL DEFAULT FALSE,
+                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS barcode_events (
+                id BIGSERIAL PRIMARY KEY,
+                client_id BIGINT NOT NULL,
+                event_type TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                details TEXT,
+                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+            )
+        """)
+
+    def init_database(self):
+        """Инициализация базы данных - создание таблиц"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        if self.is_postgres:
+            self._init_postgres_schema(cursor)
+        else:
+            self._init_sqlite_schema(cursor)
+
         conn.commit()
         self._ensure_clients_barcode(conn)
         self._ensure_clients_telegram_fields(conn)
@@ -234,8 +377,7 @@ class CafeDatabase:
     def _ensure_clients_barcode(self, conn):
         """Добавить/проверить поле barcode у клиентов и заполнить пропуски."""
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(clients)")
-        columns = {row["name"] for row in cursor.fetchall()}
+        columns = self._get_clients_columns(cursor)
 
         if "barcode" not in columns:
             cursor.execute("ALTER TABLE clients ADD COLUMN barcode TEXT")
@@ -261,8 +403,7 @@ class CafeDatabase:
     def _ensure_clients_telegram_fields(self, conn):
         """Добавить служебные поля для Telegram и клиентской страницы."""
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(clients)")
-        columns = {row["name"] for row in cursor.fetchall()}
+        columns = self._get_clients_columns(cursor)
 
         if "telegram_chat_id" not in columns:
             cursor.execute("ALTER TABLE clients ADD COLUMN telegram_chat_id TEXT")
@@ -283,6 +424,18 @@ class CafeDatabase:
                 )
 
         conn.commit()
+
+    def _get_clients_columns(self, cursor) -> set:
+        """Получить набор колонок таблицы clients."""
+        if self.is_postgres:
+            cursor.execute("""
+                SELECT column_name AS name
+                FROM information_schema.columns
+                WHERE table_name = 'clients'
+            """)
+        else:
+            cursor.execute("PRAGMA table_info(clients)")
+        return {row["name"] for row in cursor.fetchall()}
 
     def _build_barcode(self, client_id: int) -> str:
         """Сформировать стабильный уникальный EAN-13 баркод клиента."""

@@ -26,12 +26,16 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 def resolve_db_path() -> str:
     """
-    Resolve persistent database path.
+    Resolve database target.
     Priority:
-    1) DATABASE_PATH env var
+    1) DATABASE_URL env var (PostgreSQL)
+    2) DATABASE_PATH env var
     2) Render disk path (/var/data/cafe_data.sqlite3), if available
     3) Local project file
     """
+    db_url = (os.getenv("DATABASE_URL") or "").strip()
+    if db_url:
+        return db_url
     env_path = (os.getenv("DATABASE_PATH") or "").strip()
     if env_path:
         return env_path
@@ -41,7 +45,8 @@ def resolve_db_path() -> str:
 
 
 DB_PATH = resolve_db_path()
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+if "://" not in DB_PATH:
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 db = CafeDatabase(DB_PATH)
 
 
