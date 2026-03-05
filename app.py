@@ -23,7 +23,26 @@ app = Flask(__name__,
 app.secret_key = "galaxyfood2026"
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-db = CafeDatabase(os.path.join(BASE_DIR, "cafe_data.sqlite3"))
+
+def resolve_db_path() -> str:
+    """
+    Resolve persistent database path.
+    Priority:
+    1) DATABASE_PATH env var
+    2) Render disk path (/var/data/cafe_data.sqlite3), if available
+    3) Local project file
+    """
+    env_path = (os.getenv("DATABASE_PATH") or "").strip()
+    if env_path:
+        return env_path
+    if os.path.isdir("/var/data"):
+        return "/var/data/cafe_data.sqlite3"
+    return os.path.join(BASE_DIR, "cafe_data.sqlite3")
+
+
+DB_PATH = resolve_db_path()
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+db = CafeDatabase(DB_PATH)
 
 
 def today():
@@ -200,14 +219,13 @@ def send_client_card_to_telegram(client, chat_id: str):
     history_url = build_public_url(history_path)
     png_bytes = generate_barcode_png(client.barcode)
     text = (
-        f"Ваш штрихкод: `{client.barcode}`\n"
+        f"Ваш штрихкод: {client.barcode}\n"
         f"История и статус: {history_url}\n"
         "Покажите этот штрихкод в кафе при визите."
     )
     telegram_request("sendMessage", {
         "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown"
+        "text": text
     })
     telegram_send_photo(
         chat_id,

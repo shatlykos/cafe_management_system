@@ -93,6 +93,16 @@
       flex: 1;
       min-width: 180px;
     }
+    .card-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .card-link:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(43,30,20,0.16);
+    }
     .card-label { font-size: 13px; color: var(--gold-dark); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
     .card-value { font-size: 32px; font-weight: 800; color: var(--brown); margin-top: 6px; }
     .card-sub { font-size: 13px; color: #888; margin-top: 4px; }

@@ -5,21 +5,21 @@
 <h1>Добро пожаловать 👋</h1>
 
 <div class="cards">
-  <div class="card">
+  <a href="{{ url_for('breakfasts') }}" class="card card-link">
     <div class="card-label">Завтраков сегодня</div>
     <div class="card-value">{{ breakfasts_today }}</div>
     <div class="card-sub">зарегистрировано визитов</div>
-  </div>
-  <div class="card">
+  </a>
+  <a href="{{ url_for('coffee') }}" class="card card-link">
     <div class="card-label">Кофе сегодня</div>
     <div class="card-value">{{ coffees_today }}</div>
     <div class="card-sub">зарегистрировано визитов</div>
-  </div>
-  <div class="card">
+  </a>
+  <a href="{{ url_for('breakfasts') }}" class="card card-link">
     <div class="card-label">Клиентов</div>
     <div class="card-value">{{ clients_count }}</div>
     <div class="card-sub">в программе завтраков</div>
-  </div>
+  </a>
 </div>
 
 <div class="section-title">Быстрые действия</div>
@@ -30,6 +30,48 @@
   <a href="{{ url_for('coffee') }}" class="btn btn-brown" style="flex:1; min-width:200px; justify-content:center; padding:18px; font-size:17px;">
     ☕ Записать кофе
   </a>
+</div>
+
+<div class="section-title">Клиенты</div>
+<div class="cards">
+  <div class="form-box" style="flex:1; min-width:280px; margin-bottom:0;">
+    <h2 style="margin-bottom:10px;">Поиск по штрихкоду</h2>
+    <form method="POST" action="{{ url_for('search_client_by_barcode') }}">
+      <input type="hidden" name="return_to" value="index">
+      <div class="form-row" style="align-items:end; margin-bottom:0;">
+        <div class="form-group">
+          <label>Код клиента</label>
+          <input type="text" name="barcode" placeholder="Введите или сканируйте EAN-13" required>
+        </div>
+        <div class="form-group" style="flex:0 0 auto;">
+          <button class="btn btn-brown" type="submit">Найти</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="form-box" style="flex:1; min-width:280px; margin-bottom:0;">
+    <h2 style="margin-bottom:10px;">Новый клиент</h2>
+    <form method="POST" action="{{ url_for('add_client') }}">
+      <input type="hidden" name="return_to" value="index">
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Имя *</label>
+        <input type="text" name="name" placeholder="Например: Айгуль" required>
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Телефон</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="padding:10px 12px; border:2px solid var(--cream-dark); border-radius:8px; background:var(--cream); font-weight:700; color:var(--brown);">+995</span>
+          <input type="text" name="phone_local" placeholder="5XXXXXXXX" inputmode="numeric" pattern="[0-9]{9}">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Примечания</label>
+        <input type="text" name="notes" placeholder="Необязательно">
+      </div>
+      <button class="btn btn-gold mt-16" type="submit">Добавить клиента</button>
+    </form>
+  </div>
 </div>
 
 {% endblock %}
