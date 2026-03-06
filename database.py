@@ -948,7 +948,7 @@ class CafeDatabase:
         cursor.execute("""
             INSERT INTO breakfast_visits (client_id, date, is_free)
             VALUES (?, ?, ?)
-        """, (client_id, date, int(is_free)))
+        """, (client_id, date, bool(is_free)))
         conn.commit()
         visit_id = cursor.lastrowid
         conn.close()
@@ -1057,7 +1057,7 @@ class CafeDatabase:
         cursor.execute("""
             INSERT INTO coffee_visits (client_id, date, is_free)
             VALUES (?, ?, ?)
-        """, (client_id, date, int(is_free)))
+        """, (client_id, date, bool(is_free)))
         conn.commit()
         visit_id = cursor.lastrowid
         conn.close()
