@@ -291,7 +291,15 @@ def register_breakfast():
     client_id = int(request.form["client_id"])
     date = request.form.get("date") or today()
     client = db.get_client(client_id)
-    _, is_free = db.add_breakfast_visit(client_id, date)
+    if not client:
+        flash("Клиент не найден. Обновите страницу и попробуйте снова.", "danger")
+        return redirect(url_for("breakfasts"))
+    try:
+        _, is_free = db.add_breakfast_visit(client_id, date)
+    except Exception as exc:
+        app.logger.error("Failed to register breakfast: %s", exc)
+        flash("Не удалось записать завтрак. Проверьте лог сервера.", "danger")
+        return redirect(url_for("breakfasts"))
     if is_free:
         flash(f"🎉 Поздравляем! 7-й завтрак {client.name} за 30 дней — БЕСПЛАТНО!", "success")
     else:
@@ -314,7 +322,12 @@ def scan_breakfast_by_barcode():
     if not client:
         flash(f"Клиент с кодом {barcode_value} не найден.", "danger")
         return redirect(url_for("breakfasts"))
-    _, is_free = db.add_breakfast_visit(client.id, date)
+    try:
+        _, is_free = db.add_breakfast_visit(client.id, date)
+    except Exception as exc:
+        app.logger.error("Failed to scan breakfast: %s", exc)
+        flash("Не удалось записать завтрак по скану. Проверьте лог сервера.", "danger")
+        return redirect(url_for("breakfasts"))
     db.log_barcode_event(client.id, "scanned", f"Завтрак зарегистрирован за {date}")
     if is_free:
         flash(f"Сканирование OK: {client.name}. Это бесплатный завтрак.", "success")
@@ -354,7 +367,15 @@ def register_coffee():
     client_id = int(request.form["client_id"])
     date = request.form.get("date") or today()
     client = db.get_client(client_id)
-    _, is_free = db.add_coffee_visit(client_id, date)
+    if not client:
+        flash("Клиент не найден. Обновите страницу и попробуйте снова.", "danger")
+        return redirect(url_for("coffee"))
+    try:
+        _, is_free = db.add_coffee_visit(client_id, date)
+    except Exception as exc:
+        app.logger.error("Failed to register coffee: %s", exc)
+        flash("Не удалось записать кофе. Проверьте лог сервера.", "danger")
+        return redirect(url_for("coffee"))
     if is_free:
         flash(f"🎉 Поздравляем! 7-й кофе {client.name} за 30 дней — БЕСПЛАТНО!", "success")
     else:
@@ -377,7 +398,12 @@ def scan_coffee_by_barcode():
     if not client:
         flash(f"Клиент с кодом {barcode_value} не найден.", "danger")
         return redirect(url_for("coffee"))
-    _, is_free = db.add_coffee_visit(client.id, date)
+    try:
+        _, is_free = db.add_coffee_visit(client.id, date)
+    except Exception as exc:
+        app.logger.error("Failed to scan coffee: %s", exc)
+        flash("Не удалось записать кофе по скану. Проверьте лог сервера.", "danger")
+        return redirect(url_for("coffee"))
     db.log_barcode_event(client.id, "coffee_scanned", f"Кофе зарегистрирован за {date}")
     if is_free:
         flash(f"Сканирование OK: {client.name}. Это бесплатный кофе.", "success")
