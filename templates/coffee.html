@@ -12,18 +12,15 @@
 </p>
 
 <div class="form-box" style="margin-bottom:18px;">
-  <form method="POST" action="{{ url_for('scan_coffee_by_barcode') }}">
+  <form method="POST" action="{{ url_for('search_client_by_barcode') }}">
+    <input type="hidden" name="return_to" value="coffee">
     <div class="form-row" style="align-items:end;">
       <div class="form-group" style="min-width:280px;">
         <label>Сканировать штрихкод</label>
-        <input type="text" name="barcode" placeholder="Отсканируйте EAN-13 код" autofocus required>
-      </div>
-      <div class="form-group">
-        <label>Дата</label>
-        <input type="date" name="date" value="{{ request.args.get('date', '') or today }}">
+        <input type="text" name="barcode" placeholder="Отсканируйте EAN-13 код для поиска клиента" autofocus required>
       </div>
       <div class="form-group" style="flex:0 0 auto;">
-        <button class="btn btn-green" type="submit">Сканировать и записать</button>
+        <button class="btn btn-brown" type="submit">Найти клиента</button>
       </div>
     </div>
   </form>
@@ -81,6 +78,9 @@
             <input type="hidden" name="client_id" value="{{ c.id }}">
             <input type="hidden" name="date" value="{{ request.args.get('date', '') }}">
             <button class="btn btn-green btn-sm" type="submit">✔ Записать кофе</button>
+          </form>
+          <form method="POST" action="{{ url_for('undo_last_coffee', client_id=c.id) }}" style="display:inline;">
+            <button class="btn btn-sm" type="submit" style="background:#FFB300; color:#fff;">↺ Откатить</button>
           </form>
           <a href="{{ url_for('coffee_history', client_id=c.id) }}" class="btn btn-sm" style="background:var(--cream-dark); color:var(--brown);">История</a>
           <form method="POST" action="{{ url_for('delete_client', client_id=c.id) }}" style="display:inline;"

@@ -831,21 +831,15 @@ class CafeDatabase:
 
     def find_clients_by_barcode_fragment(self, fragment: str, limit: int = 20) -> List[Client]:
         """Найти клиентов по фрагменту штрихкода (например, по последним цифрам)."""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        like_value = f"%{fragment}%"
-        cursor.execute("""
-            SELECT * FROM clients
-            WHERE barcode LIKE ?
-            ORDER BY name
-            LIMIT ?
-        """, (like_value, limit))
-        rows = cursor.fetchall()
-        conn.close()
-        return [Client(id=r['id'], name=r['name'], phone=r['phone'],
-                       notes=r['notes'], barcode=r['barcode'],
-                       telegram_chat_id=r['telegram_chat_id'],
-                       history_token=r['history_token']) for r in rows]
+        frag = "".join(ch for ch in (fragment or "") if ch.isdigit())
+        if not frag:
+            return []
+        # Python-filter to keep behavior identical across sqlite/postgres.
+        clients = self.get_clients()
+        matches = [c for c in clients if c.barcode and frag in c.barcode]
+        # Prefer suffix matches (usually вводят последние цифры).
+        matches.sort(key=lambda c: (0 if c.barcode.endswith(frag) else 1, c.name.lower()))
+        return matches[:limit]
 
     def get_client_by_history_token(self, token: str) -> Optional[Client]:
         """Получить клиента по токену страницы истории."""
@@ -1025,6 +1019,24 @@ class CafeDatabase:
             'next_is_free': (count_30_days % 7 == 6),
         }
 
+    def delete_last_breakfast_visit(self, client_id: int) -> bool:
+        """Удалить последнее посещение завтрака клиента."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM breakfast_visits
+            WHERE id = (
+                SELECT id FROM breakfast_visits
+                WHERE client_id = ?
+                ORDER BY date DESC, id DESC
+                LIMIT 1
+            )
+        """, (client_id,))
+        changed = cursor._cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
+
     # ========== Кофе ==========
 
     def get_coffee_count_total(self, client_id: int) -> int:
@@ -1132,6 +1144,24 @@ class CafeDatabase:
             'visits_until_free': visits_until_free,
             'next_is_free': (count_30_days % 7 == 6),
         }
+
+    def delete_last_coffee_visit(self, client_id: int) -> bool:
+        """Удалить последнее посещение кофе клиента."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM coffee_visits
+            WHERE id = (
+                SELECT id FROM coffee_visits
+                WHERE client_id = ?
+                ORDER BY date DESC, id DESC
+                LIMIT 1
+            )
+        """, (client_id,))
+        changed = cursor._cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
 
     # ========== Журнал баркодов ==========
 

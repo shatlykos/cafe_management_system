@@ -311,28 +311,22 @@ def register_breakfast():
     return redirect(url_for("breakfasts"))
 
 
-@app.route("/breakfasts/scan", methods=["POST"])
-def scan_breakfast_by_barcode():
-    barcode_value = (request.form.get("barcode") or "").strip()
-    date = request.form.get("date") or today()
-    if not barcode_value:
-        flash("Введите штрихкод для сканирования.", "danger")
-        return redirect(url_for("breakfasts"))
-    client = db.get_client_by_barcode(barcode_value)
+@app.route("/breakfasts/undo/<int:client_id>", methods=["POST"])
+def undo_last_breakfast(client_id):
+    client = db.get_client(client_id)
     if not client:
-        flash(f"Клиент с кодом {barcode_value} не найден.", "danger")
+        flash("Клиент не найден.", "danger")
         return redirect(url_for("breakfasts"))
     try:
-        _, is_free = db.add_breakfast_visit(client.id, date)
+        deleted = db.delete_last_breakfast_visit(client_id)
     except Exception as exc:
-        app.logger.error("Failed to scan breakfast: %s", exc)
-        flash("Не удалось записать завтрак по скану. Проверьте лог сервера.", "danger")
+        app.logger.error("Failed to undo breakfast: %s", exc)
+        flash("Не удалось откатить последний завтрак.", "danger")
         return redirect(url_for("breakfasts"))
-    db.log_barcode_event(client.id, "scanned", f"Завтрак зарегистрирован за {date}")
-    if is_free:
-        flash(f"Сканирование OK: {client.name}. Это бесплатный завтрак.", "success")
+    if not deleted:
+        flash(f"У клиента {client.name} нет записей завтрака для отката.", "warning")
     else:
-        flash(f"Сканирование OK: {client.name}. Завтрак записан.", "success")
+        flash(f"Последний завтрак клиента {client.name} успешно удалён.", "info")
     return redirect(url_for("breakfasts"))
 
 
@@ -387,28 +381,22 @@ def register_coffee():
     return redirect(url_for("coffee"))
 
 
-@app.route("/coffee/scan", methods=["POST"])
-def scan_coffee_by_barcode():
-    barcode_value = (request.form.get("barcode") or "").strip()
-    date = request.form.get("date") or today()
-    if not barcode_value:
-        flash("Введите штрихкод для сканирования.", "danger")
-        return redirect(url_for("coffee"))
-    client = db.get_client_by_barcode(barcode_value)
+@app.route("/coffee/undo/<int:client_id>", methods=["POST"])
+def undo_last_coffee(client_id):
+    client = db.get_client(client_id)
     if not client:
-        flash(f"Клиент с кодом {barcode_value} не найден.", "danger")
+        flash("Клиент не найден.", "danger")
         return redirect(url_for("coffee"))
     try:
-        _, is_free = db.add_coffee_visit(client.id, date)
+        deleted = db.delete_last_coffee_visit(client_id)
     except Exception as exc:
-        app.logger.error("Failed to scan coffee: %s", exc)
-        flash("Не удалось записать кофе по скану. Проверьте лог сервера.", "danger")
+        app.logger.error("Failed to undo coffee: %s", exc)
+        flash("Не удалось откатить последний кофе.", "danger")
         return redirect(url_for("coffee"))
-    db.log_barcode_event(client.id, "coffee_scanned", f"Кофе зарегистрирован за {date}")
-    if is_free:
-        flash(f"Сканирование OK: {client.name}. Это бесплатный кофе.", "success")
+    if not deleted:
+        flash(f"У клиента {client.name} нет записей кофе для отката.", "warning")
     else:
-        flash(f"Сканирование OK: {client.name}. Кофе записан.", "success")
+        flash(f"Последний кофе клиента {client.name} успешно удалён.", "info")
     return redirect(url_for("coffee"))
 
 
@@ -448,17 +436,26 @@ def search_client_by_barcode():
     barcode_value = (request.form.get("barcode") or "").strip()
     barcode_digits = "".join(ch for ch in barcode_value if ch.isdigit())
     return_to = (request.form.get("return_to") or "").strip()
-    fallback = url_for("index") if return_to == "index" else url_for("breakfasts")
+    if return_to == "index":
+        fallback = url_for("index")
+    elif return_to == "coffee":
+        fallback = url_for("coffee")
+    else:
+        fallback = url_for("breakfasts")
     if not barcode_digits:
         flash("Введите штрихкод для поиска.", "danger")
         return redirect(fallback)
 
     client = db.get_client_by_barcode(barcode_digits)
     if client:
+        if return_to == "coffee":
+            return redirect(url_for("coffee_history", client_id=client.id))
         return redirect(url_for("breakfast_history", client_id=client.id))
 
     matches = db.find_clients_by_barcode_fragment(barcode_digits, limit=10)
     if len(matches) == 1:
+        if return_to == "coffee":
+            return redirect(url_for("coffee_history", client_id=matches[0].id))
         return redirect(url_for("breakfast_history", client_id=matches[0].id))
     if len(matches) > 1:
         sample = ", ".join(f"{c.name} ({c.barcode})" for c in matches[:3])
@@ -469,6 +466,8 @@ def search_client_by_barcode():
     if not client:
         flash(f"Клиент с кодом {barcode_digits} не найден.", "warning")
         return redirect(fallback)
+    if return_to == "coffee":
+        return redirect(url_for("coffee_history", client_id=client.id))
     return redirect(url_for("breakfast_history", client_id=client.id))
 
 
