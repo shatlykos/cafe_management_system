@@ -446,14 +446,28 @@ def add_client():
 @app.route("/clients/search", methods=["POST"])
 def search_client_by_barcode():
     barcode_value = (request.form.get("barcode") or "").strip()
+    barcode_digits = "".join(ch for ch in barcode_value if ch.isdigit())
     return_to = (request.form.get("return_to") or "").strip()
     fallback = url_for("index") if return_to == "index" else url_for("breakfasts")
-    if not barcode_value:
+    if not barcode_digits:
         flash("Введите штрихкод для поиска.", "danger")
         return redirect(fallback)
-    client = db.get_client_by_barcode(barcode_value)
+
+    client = db.get_client_by_barcode(barcode_digits)
+    if client:
+        return redirect(url_for("breakfast_history", client_id=client.id))
+
+    matches = db.find_clients_by_barcode_fragment(barcode_digits, limit=10)
+    if len(matches) == 1:
+        return redirect(url_for("breakfast_history", client_id=matches[0].id))
+    if len(matches) > 1:
+        sample = ", ".join(f"{c.name} ({c.barcode})" for c in matches[:3])
+        flash(f"Найдено несколько клиентов по «{barcode_digits}». Уточните код. Примеры: {sample}", "warning")
+        return redirect(fallback)
+
+    client = None
     if not client:
-        flash(f"Клиент с кодом {barcode_value} не найден.", "warning")
+        flash(f"Клиент с кодом {barcode_digits} не найден.", "warning")
         return redirect(fallback)
     return redirect(url_for("breakfast_history", client_id=client.id))
 

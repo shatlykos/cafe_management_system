@@ -829,6 +829,24 @@ class CafeDatabase:
                           history_token=row['history_token'])
         return None
 
+    def find_clients_by_barcode_fragment(self, fragment: str, limit: int = 20) -> List[Client]:
+        """Найти клиентов по фрагменту штрихкода (например, по последним цифрам)."""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        like_value = f"%{fragment}%"
+        cursor.execute("""
+            SELECT * FROM clients
+            WHERE barcode LIKE ?
+            ORDER BY name
+            LIMIT ?
+        """, (like_value, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [Client(id=r['id'], name=r['name'], phone=r['phone'],
+                       notes=r['notes'], barcode=r['barcode'],
+                       telegram_chat_id=r['telegram_chat_id'],
+                       history_token=r['history_token']) for r in rows]
+
     def get_client_by_history_token(self, token: str) -> Optional[Client]:
         """Получить клиента по токену страницы истории."""
         conn = self.get_connection()
